@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
     process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
     process.env.GOOGLE_CLIENT_ID ||
     "";
+  const spotifyClientSecret = process.env.SPOTIFY_CLIENT_SECRET || "";
   const refreshToken =
     process.env.PULSEIFY_SPOTIFY_REFRESH_TOKEN ||
     req.cookies.get("pulseify_spotify_rt")?.value ||
@@ -28,9 +29,18 @@ export async function GET(req: NextRequest) {
 
   if (refreshToken && spotifyClientId) {
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/x-www-form-urlencoded",
+      };
+      if (spotifyClientSecret) {
+        const basic = Buffer.from(
+          `${spotifyClientId}:${spotifyClientSecret}`
+        ).toString("base64");
+        headers["Authorization"] = `Basic ${basic}`;
+      }
       const res = await fetch("https://accounts.spotify.com/api/token", {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        headers,
         body: new URLSearchParams({
           grant_type: "refresh_token",
           refresh_token: refreshToken,
