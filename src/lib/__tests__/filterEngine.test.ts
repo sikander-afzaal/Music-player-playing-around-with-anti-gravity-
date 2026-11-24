@@ -9,6 +9,13 @@ import {
   formatNumber,
   formatDelta,
 } from "../filterEngine";
+import {
+  generateTotpCode,
+  verifyTotpCode,
+  isEmailAllowed,
+  createSignedSessionToken,
+  verifySignedSessionToken,
+} from "../totpAuth";
 
 describe("filterEngine", () => {
   it("returns all artists sorted by rank ascending with default filters", () => {
@@ -98,5 +105,26 @@ describe("filterEngine", () => {
     assert.equal(formatNumber(123001628), "123,001,628");
     assert.equal(formatDelta(408975), "+408,975");
     assert.equal(formatDelta(-299084), "-299,084");
+  });
+
+  it("verifies RFC 6238 TOTP codes, allowlist emails, and signed session tokens", () => {
+    const secret = "JBSWY3DPEHPK3PXP247AC5LQMVZGC43F";
+    const now = 1_750_000_000_000;
+    const code = generateTotpCode(secret, now);
+    assert.equal(code.length, 6);
+    assert.ok(verifyTotpCode(code, secret, now));
+    // Adjacent 30s step should also pass within ±1 window
+    assert.ok(verifyTotpCode(code, secret, now + 29_000));
+    // Wrong code should fail
+    assert.equal(verifyTotpCode("000000", secret, now), code === "000000");
+
+    assert.ok(isEmailAllowed("sikander.aaa@gmail.com"));
+    assert.ok(!isEmailAllowed("intruder@example.com"));
+
+    const token = createSignedSessionToken("sikander.aaa@gmail.com");
+    const verified = verifySignedSessionToken(token);
+    assert.ok(verified);
+    assert.equal(verified?.email, "sikander.aaa@gmail.com");
+    assert.equal(verifySignedSessionToken(token + "tampered"), null);
   });
 });

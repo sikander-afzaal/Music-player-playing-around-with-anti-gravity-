@@ -15,6 +15,8 @@ import {
   Loader2,
   Tv,
   Radio,
+  Download,
+  Lock,
 } from "lucide-react";
 import {
   ArtistStat,
@@ -43,6 +45,13 @@ interface NavbarProps {
     track: YouTubeTrackItem,
     queue?: YouTubeTrackItem[]
   ) => void;
+  authenticatedEmail?: string | null;
+  onLockApp?: () => void;
+}
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
 export default function Navbar({
@@ -56,9 +65,45 @@ export default function Navbar({
   onPlayArtist,
   onPlaySong,
   onPlayYouTubeTrack,
+  authenticatedEmail,
+  onLockApp,
 }: NavbarProps) {
   const isYouTubeMode = activeTab === "youtube";
   const [lastSpotifyTab, setLastSpotifyTab] = useState<DashboardTab>("artists");
+  const [installPrompt, setInstallPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as unknown as { standalone?: boolean }).standalone
+    ) {
+      setIsStandalone(true);
+    }
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  const handleInstallPwa = async () => {
+    if (installPrompt) {
+      await installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      if (choice.outcome === "accepted") {
+        setInstallPrompt(null);
+        setIsStandalone(true);
+      }
+      return;
+    }
+    window.alert(
+      "To install Pulseify as a standalone App:\n\n• Desktop (Chrome / Edge / Brave): Click the 'Install Pulseify' icon on the right side of your browser address bar.\n• iPhone / Android: Tap Share → 'Add to Home Screen'."
+    );
+  };
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [liveResults, setLiveResults] = useState<{
@@ -517,6 +562,17 @@ export default function Navbar({
             )}
           </div>
 
+          {!isStandalone && (
+            <button
+              onClick={handleInstallPwa}
+              title="Install Pulseify as a Desktop or Mobile App"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/5 px-3 py-1.5 text-xs font-bold text-slate-200 hover:border-[#1ED760]/40 hover:bg-white/10 hover:text-white transition cursor-pointer"
+            >
+              <Download className="h-3.5 w-3.5 text-[#1ED760]" />
+              <span>Install App</span>
+            </button>
+          )}
+
           <button
             onClick={onOpenLogin}
             className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
@@ -544,6 +600,16 @@ export default function Navbar({
               </>
             )}
           </button>
+
+          {authenticatedEmail && onLockApp && (
+            <button
+              onClick={onLockApp}
+              title={`Keycloak 2FA Active (${authenticatedEmail}) — Click to Lock App`}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/12 bg-white/5 text-slate-400 hover:border-rose-500/40 hover:bg-rose-500/15 hover:text-rose-300 transition cursor-pointer"
+            >
+              <Lock className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
     </header>

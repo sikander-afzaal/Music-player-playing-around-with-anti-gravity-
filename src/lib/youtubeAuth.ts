@@ -36,19 +36,11 @@ declare global {
 
 export function getSavedGoogleRedirectUri(): string {
   if (typeof window === "undefined") return "http://127.0.0.1:3000";
-  return (
-    localStorage.getItem(YT_STORAGE.GOOGLE_REDIRECT_URI) ||
-    window.location.origin
-  );
+  return window.location.origin;
 }
 
 export function getSavedGoogleClientId(): string {
-  if (typeof window === "undefined") return "";
-  return (
-    localStorage.getItem(YT_STORAGE.GOOGLE_CLIENT_ID) ||
-    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-    ""
-  );
+  return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
 }
 
 export function getStoredGoogleToken(): string | null {

@@ -106,12 +106,7 @@ function base64encode(input: ArrayBuffer): string {
 }
 
 export function getSavedClientId(): string {
-  if (typeof window === "undefined") return DEFAULT_CLIENT_ID;
-  return (
-    localStorage.getItem(STORAGE_KEYS.CLIENT_ID) ||
-    process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ||
-    DEFAULT_CLIENT_ID
-  );
+  return process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || DEFAULT_CLIENT_ID;
 }
 
 export function getStoredAccessToken(): string | null {
@@ -215,8 +210,6 @@ export function getCachedSession(): {
 
 export function getRedirectUri(): string {
   if (typeof window === "undefined") return "http://127.0.0.1:3000";
-  const saved = localStorage.getItem(STORAGE_KEYS.REDIRECT_URI);
-  if (saved) return saved;
   return window.location.origin.replace("://localhost", "://127.0.0.1");
 }
 

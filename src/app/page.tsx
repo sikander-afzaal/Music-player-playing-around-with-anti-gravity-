@@ -13,6 +13,7 @@ import YouTubeView from "../components/YouTubeView";
 import DetailDrawer from "../components/DetailDrawer";
 import PlayerBar from "../components/PlayerBar";
 import LoginModal from "../components/LoginModal";
+import AuthGate from "../components/AuthGate";
 import {
   DEMO_VAULT,
   TOP_ARTISTS,
@@ -79,9 +80,30 @@ export default function SpotifyTrackerDashboard() {
   const [vault, setVault] = useState<PersonalVaultData>(DEMO_VAULT);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
 
+  // Keycloak + TOTP 2FA Gate state
+  const [kcChecked, setKcChecked] = useState(false);
+  const [kcEmail, setKcEmail] = useState<string | null>(null);
+  const [kcIssuer, setKcIssuer] = useState<string | null>(null);
+
   // Restore cached session immediately on mount, then refresh/handle OAuth callback in background
   useEffect(() => {
     setMounted(true);
+
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.authenticated && data?.email) {
+          setKcEmail(data.email);
+        }
+        if (data?.keycloakIssuer) {
+          setKcIssuer(data.keycloakIssuer);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        setKcChecked(true);
+      });
+
     const cached = getCachedSession();
     if (cached) {
       setUser(cached.profile);
@@ -325,8 +347,26 @@ export default function SpotifyTrackerDashboard() {
     setVault(res.vault);
   };
 
-  if (!mounted) {
+  const handleLockApp = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // ignore
+    }
+    setKcEmail(null);
+  };
+
+  if (!mounted || !kcChecked) {
     return <div className="min-h-screen bg-[#07080C]" suppressHydrationWarning />;
+  }
+
+  if (!kcEmail) {
+    return (
+      <AuthGate
+        onAuthenticated={(email) => setKcEmail(email)}
+        keycloakIssuer={kcIssuer}
+      />
+    );
   }
 
   return (
@@ -345,6 +385,8 @@ export default function SpotifyTrackerDashboard() {
         onSelectSong={handleSelectSong}
         onPlaySong={handlePlaySong}
         onPlayYouTubeTrack={handlePlayYouTubeTrack}
+        authenticatedEmail={kcEmail}
+        onLockApp={handleLockApp}
       />
 
       {/* Main Workspace Container */}

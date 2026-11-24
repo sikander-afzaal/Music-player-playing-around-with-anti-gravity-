@@ -65,9 +65,30 @@ export default function YouTubeView({
   const [googleUser, setGoogleUser] = useState<GoogleUserProfile | null>(null);
   const [likedVideos, setLikedVideos] = useState<YouTubeTrackItem[]>([]);
   const [playlists, setPlaylists] = useState<YouTubePlaylistItem[]>([]);
-  const [showGoogleModal, setShowGoogleModal] = useState(false);
-  const [googleClientId, setGoogleClientId] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
+
+  const handleOneClickGoogleLogin = () => {
+    setAuthError(null);
+    const clientId = getSavedGoogleClientId();
+    try {
+      initiateGooglePopupLogin(
+        clientId,
+        (live) => {
+          setGoogleUser(live.profile);
+          setLikedVideos(live.likedVideos);
+          setPlaylists(live.playlists);
+        },
+        () => {
+          // Fallback to redirect flow if popup library isn't ready
+          initiateGoogleOAuthLogin(clientId);
+        }
+      );
+    } catch (err) {
+      setAuthError(
+        err instanceof Error ? err.message : "Failed to start Google OAuth"
+      );
+    }
+  };
 
   // Playlist URL Importer & Selected Playlist drill-down
   const [importUrl, setImportUrl] = useState("");
@@ -83,7 +104,6 @@ export default function YouTubeView({
     setGoogleUser(cached.profile);
     setLikedVideos(cached.likedVideos);
     setPlaylists(cached.playlists);
-    setGoogleClientId(getSavedGoogleClientId());
 
     handleGoogleOAuthCallback()
       .then((res) => {
@@ -243,7 +263,7 @@ export default function YouTubeView({
               </div>
             ) : (
               <button
-                onClick={() => setShowGoogleModal(true)}
+                onClick={handleOneClickGoogleLogin}
                 className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-xs font-extrabold text-black shadow-lg hover:bg-slate-200 transition cursor-pointer"
               >
                 <Sparkles className="h-4 w-4 text-rose-600" />
@@ -252,6 +272,11 @@ export default function YouTubeView({
             )}
           </div>
         </div>
+        {authError && (
+          <p className="mt-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+            {authError}
+          </p>
+        )}
 
         {/* Search Input + Category Pills */}
         <div className="mt-5 space-y-3 border-t border-white/10 pt-4">
@@ -423,7 +448,7 @@ export default function YouTubeView({
                     above to import your playlists.
                   </p>
                   <button
-                    onClick={() => setShowGoogleModal(true)}
+                    onClick={handleOneClickGoogleLogin}
                     className="rounded-xl bg-white px-4 py-2 text-xs font-extrabold text-black cursor-pointer"
                   >
                     Connect Google Account
@@ -577,127 +602,6 @@ export default function YouTubeView({
               })}
             </div>
           )}
-        </div>
-      )}
-
-      {/* GOOGLE OAUTH 2.0 LOGIN MODAL */}
-      {showGoogleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-          <div className="relative w-full max-w-lg rounded-3xl border border-white/15 bg-[#10131C] p-6 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400">
-                  <Tv className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">
-                    Login with Google / YouTube
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Sync your personal YouTube Playlists &amp; Liked Music Videos
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowGoogleModal(false)}
-                className="rounded-lg px-2.5 py-1 text-xs text-slate-400 hover:bg-white/10 hover:text-white cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setAuthError(null);
-                try {
-                  initiateGoogleOAuthLogin(googleClientId);
-                } catch (err) {
-                  setAuthError(
-                    err instanceof Error ? err.message : "Failed to start OAuth"
-                  );
-                }
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <label className="flex items-center justify-between text-xs font-semibold text-slate-300 mb-1.5">
-                  <span className="flex items-center gap-1.5">
-                    <KeyRound className="h-3.5 w-3.5 text-rose-400" />
-                    Google OAuth 2.0 Web Client ID
-                  </span>
-                  <a
-                    href="https://console.cloud.google.com/apis/credentials"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] text-rose-400 hover:underline"
-                  >
-                    Google Cloud Console <ExternalLink className="h-3 w-3" />
-                  </a>
-                </label>
-                <input
-                  type="text"
-                  value={googleClientId}
-                  onChange={(e) => setGoogleClientId(e.target.value)}
-                  placeholder="e.g. 1234567890-abcde.apps.googleusercontent.com"
-                  className="w-full rounded-xl border border-white/15 bg-black/50 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none"
-                />
-                <p className="mt-1.5 text-[11px] text-slate-400">
-                  Enable <strong>YouTube Data API v3</strong> in Google Cloud and
-                  add{" "}
-                  <code className="rounded bg-white/10 px-1.5 py-0.5 text-slate-200">
-                    http://127.0.0.1:3000
-                  </code>{" "}
-                  to Authorized JavaScript Origins &amp; Redirect URIs.
-                </p>
-              </div>
-
-              {authError && (
-                <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
-                  {authError}
-                </p>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthError(null);
-                    initiateGooglePopupLogin(
-                      googleClientId,
-                      (live) => {
-                        setGoogleUser(live.profile);
-                        setLikedVideos(live.likedVideos);
-                        setPlaylists(live.playlists);
-                        setShowGoogleModal(false);
-                      },
-                      (msg) => setAuthError(msg)
-                    );
-                  }}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-500 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-rose-400 transition cursor-pointer"
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  Sign In via Google Popup
-                </button>
-                <button
-                  type="submit"
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-bold text-white hover:bg-white/10 transition cursor-pointer"
-                >
-                  Sign In via Redirect
-                </button>
-              </div>
-            </form>
-
-            <div className="rounded-xl border border-white/10 bg-black/40 p-3.5 text-xs text-slate-300">
-              <strong className="text-white">Tip:</strong> Every YouTube search,
-              full-song playback, synced lyrics, and Playlist URL importing works{" "}
-              <span className="text-[#1ED760] font-bold">
-                100% immediately without needing a Google Client ID
-              </span>
-              ! Only connect Google OAuth if you want to auto-pull private
-              playlists from your Google account.
-            </div>
-          </div>
         </div>
       )}
     </div>

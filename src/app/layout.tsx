@@ -1,10 +1,23 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  themeColor: "#07080c",
+};
 
 export const metadata: Metadata = {
   title: "Pulseify — Real-Time Spotify Stats, Monthly Listeners & Viral Charts",
   description:
-    "Next-generation Spotify analytics tracker inspired by Kworb. Track monthly listeners, daily +/- deltas, peak records, regional charts, and stream songs live.",
+    "Next-generation Spotify & YouTube Music analytics tracker and studio player.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Pulseify",
+  },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
+  },
 };
 
 const STRIP_EXTENSION_ATTRS_SCRIPT = `
@@ -44,6 +57,9 @@ const STRIP_EXTENSION_ATTRS_SCRIPT = `
   });
   window.addEventListener('load', function () {
     setTimeout(function () { obs.disconnect(); }, 4000);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(function () {});
+    }
   });
 })();
 `;
