@@ -9,10 +9,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const spotifyClientId =
-    process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ||
-    process.env.SPOTIFY_CLIENT_ID ||
-    "";
+  const isVercel = Boolean(process.env.VERCEL);
+  const spotifyClientId = isVercel
+    ? process.env.NEXT_PUBLIC_SPOTIFY_PROD_CLIENT_ID ||
+      "1f12a5bda93447f8849db99ad54d23d5"
+    : process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ||
+      "1f12a5bda93447f8849db99ad54d23d5";
   const googleClientId =
     process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
     process.env.GOOGLE_CLIENT_ID ||

@@ -81,7 +81,9 @@ function formatRelativeAdded(ms: number): string {
   });
 }
 
-const DEFAULT_CLIENT_ID = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || "";
+const DEFAULT_CLIENT_ID =
+  process.env.NEXT_PUBLIC_SPOTIFY_PROD_CLIENT_ID ||
+  "1f12a5bda93447f8849db99ad54d23d5";
 
 function generateRandomString(length: number): string {
   const possible =
@@ -106,12 +108,14 @@ function base64encode(input: ArrayBuffer): string {
 }
 
 export function getSavedClientId(): string {
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname.endsWith(".vercel.app")
+  ) {
+    return DEFAULT_CLIENT_ID;
+  }
   if (process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID) {
     return process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID;
-  }
-  if (typeof window !== "undefined") {
-    const stored = localStorage.getItem(STORAGE_KEYS.CLIENT_ID);
-    if (stored) return stored;
   }
   return DEFAULT_CLIENT_ID;
 }
