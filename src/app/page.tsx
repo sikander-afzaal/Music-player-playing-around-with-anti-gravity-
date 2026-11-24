@@ -90,6 +90,16 @@ export default function SpotifyTrackerDashboard() {
 
   // Restore cached session immediately on mount, then refresh/handle OAuth callback in background
   useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      window.location.hostname.endsWith(".vercel.app") &&
+      window.location.hostname !== "pulseify-studio.vercel.app"
+    ) {
+      window.location.replace(
+        `https://pulseify-studio.vercel.app${window.location.pathname}${window.location.search}${window.location.hash}`
+      );
+      return;
+    }
     setMounted(true);
 
     fetch("/api/auth/session")

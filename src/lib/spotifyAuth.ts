@@ -237,8 +237,17 @@ export function getCachedSession(): {
 }
 
 export function getRedirectUri(): string {
-  if (typeof window === "undefined") return "http://127.0.0.1:3000";
-  return window.location.origin.replace("://localhost", "://127.0.0.1");
+  if (typeof window === "undefined") {
+    return "https://pulseify-studio.vercel.app";
+  }
+  const host = window.location.hostname;
+  if (host === "127.0.0.1" || host === "localhost") {
+    return window.location.origin.replace("://localhost", "://127.0.0.1");
+  }
+  if (host.endsWith(".vercel.app")) {
+    return "https://pulseify-studio.vercel.app";
+  }
+  return window.location.origin;
 }
 
 export async function initiateSpotifyPkceLogin(
