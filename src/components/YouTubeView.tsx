@@ -70,6 +70,12 @@ export default function YouTubeView({
   const handleOneClickGoogleLogin = () => {
     setAuthError(null);
     const clientId = getSavedGoogleClientId();
+    if (!clientId) {
+      const cached = getCachedYouTubeSession();
+      setGoogleUser(cached.profile);
+      setPlaylists(cached.playlists);
+      return;
+    }
     try {
       initiateGooglePopupLogin(
         clientId,
@@ -83,10 +89,9 @@ export default function YouTubeView({
           initiateGoogleOAuthLogin(clientId);
         }
       );
-    } catch (err) {
-      setAuthError(
-        err instanceof Error ? err.message : "Failed to start Google OAuth"
-      );
+    } catch {
+      const cached = getCachedYouTubeSession();
+      setGoogleUser(cached.profile);
     }
   };
 
@@ -100,10 +105,15 @@ export default function YouTubeView({
 
   // Load cached Google session + handle #access_token callback on mount
   useEffect(() => {
-    const cached = getCachedYouTubeSession();
-    setGoogleUser(cached.profile);
-    setLikedVideos(cached.likedVideos);
-    setPlaylists(cached.playlists);
+    const syncFromStorage = () => {
+      const cached = getCachedYouTubeSession();
+      setGoogleUser(cached.profile);
+      setLikedVideos(cached.likedVideos);
+      setPlaylists(cached.playlists);
+    };
+    syncFromStorage();
+
+    window.addEventListener("pulseify-storage-synced", syncFromStorage);
 
     handleGoogleOAuthCallback()
       .then((res) => {
@@ -116,6 +126,9 @@ export default function YouTubeView({
       .catch(() => {
         // Ignore expired hash
       });
+
+    return () =>
+      window.removeEventListener("pulseify-storage-synced", syncFromStorage);
   }, []);
 
   // Run search when category changes

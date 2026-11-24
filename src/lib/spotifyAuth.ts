@@ -106,7 +106,35 @@ function base64encode(input: ArrayBuffer): string {
 }
 
 export function getSavedClientId(): string {
-  return process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || DEFAULT_CLIENT_ID;
+  if (process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID) {
+    return process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID;
+  }
+  if (typeof window !== "undefined") {
+    const stored = localStorage.getItem(STORAGE_KEYS.CLIENT_ID);
+    if (stored) return stored;
+  }
+  return DEFAULT_CLIENT_ID;
+}
+
+export function applyServerSpotifyTokens(
+  accessToken: string,
+  refreshToken?: string | null,
+  clientId?: string | null
+): void {
+  if (typeof window === "undefined") return;
+  if (accessToken) {
+    localStorage.setItem(STORAGE_KEYS.TOKEN, accessToken);
+    localStorage.setItem(
+      STORAGE_KEYS.EXPIRES_AT,
+      String(Date.now() + 3500 * 1000)
+    );
+  }
+  if (refreshToken) {
+    localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+  }
+  if (clientId) {
+    localStorage.setItem(STORAGE_KEYS.CLIENT_ID, clientId);
+  }
 }
 
 export function getStoredAccessToken(): string | null {
@@ -345,6 +373,22 @@ export async function handleSpotifyCallback(): Promise<{
       STORAGE_KEYS.EXPIRES_AT,
       String(Date.now() + Number(tokenData.expires_in) * 1000)
     );
+  }
+
+  try {
+    fetch("/api/auth/save-env", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        dump: {
+          pulseify_spotify_client_id: clientId,
+          pulseify_spotify_access_token: accessToken,
+          pulseify_spotify_refresh_token: tokenData.refresh_token || "",
+        },
+      }),
+    }).catch(() => {});
+  } catch {
+    // ignore
   }
 
   const liveData = await fetchLiveSpotifyUserAndVault(accessToken);

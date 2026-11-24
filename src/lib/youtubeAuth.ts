@@ -40,7 +40,14 @@ export function getSavedGoogleRedirectUri(): string {
 }
 
 export function getSavedGoogleClientId(): string {
-  return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+  if (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) {
+    return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  }
+  if (typeof window !== "undefined") {
+    const stored = localStorage.getItem(YT_STORAGE.GOOGLE_CLIENT_ID);
+    if (stored) return stored;
+  }
+  return "";
 }
 
 export function getStoredGoogleToken(): string | null {
@@ -48,17 +55,48 @@ export function getStoredGoogleToken(): string | null {
   return localStorage.getItem(YT_STORAGE.ACCESS_TOKEN);
 }
 
+const DEFAULT_YT_PROFILE: GoogleUserProfile = {
+  id: "sikander_yt",
+  displayName: "Muhammad Sikandar Afzal",
+  email: "sikander.aaa@gmail.com",
+  avatarUrl:
+    "https://avatars.githubusercontent.com/u/77196844?v=4",
+};
+
+const DEFAULT_YT_PLAYLISTS: YouTubePlaylistItem[] = [
+  {
+    id: "PL15B1E77BB5708555",
+    title: "Coke Studio Pakistan — Season 14 & 15 Essentials",
+    description: "Official Coke Studio Pakistan sessions & indie hits",
+    coverUrl: "https://i.ytimg.com/vi/5Eqb_-j3FDA/hqdefault.jpg",
+    itemCount: 25,
+    channelTitle: "Coke Studio Pakistan",
+  },
+  {
+    id: "RDCLAK5uy_kmPRjHDECIcuVwnKsx2Ng7fyNgFKWNJFs",
+    title: "Pakistani Indie & Late Night Vibes (Bayaan, AUR, Hasan Raheem)",
+    description: "Curated Pakistani indie and acoustic tracks",
+    coverUrl: "https://i.ytimg.com/vi/7wtfhZwyrcc/hqdefault.jpg",
+    itemCount: 30,
+    channelTitle: "YouTube Music",
+  },
+];
+
 export function getCachedYouTubeSession(): {
   profile: GoogleUserProfile | null;
   likedVideos: YouTubeTrackItem[];
   playlists: YouTubePlaylistItem[];
 } {
   if (typeof window === "undefined") {
-    return { profile: null, likedVideos: [], playlists: [] };
+    return {
+      profile: DEFAULT_YT_PROFILE,
+      likedVideos: [],
+      playlists: DEFAULT_YT_PLAYLISTS,
+    };
   }
-  let profile: GoogleUserProfile | null = null;
+  let profile: GoogleUserProfile | null = DEFAULT_YT_PROFILE;
   let likedVideos: YouTubeTrackItem[] = [];
-  let playlists: YouTubePlaylistItem[] = [];
+  let playlists: YouTubePlaylistItem[] = DEFAULT_YT_PLAYLISTS;
 
   try {
     const rawProf = localStorage.getItem(YT_STORAGE.PROFILE);
@@ -74,7 +112,12 @@ export function getCachedYouTubeSession(): {
   }
   try {
     const rawPl = localStorage.getItem(YT_STORAGE.PLAYLISTS);
-    if (rawPl) playlists = JSON.parse(rawPl);
+    if (rawPl) {
+      const parsed = JSON.parse(rawPl);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        playlists = parsed;
+      }
+    }
   } catch {
     // ignore
   }

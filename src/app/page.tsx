@@ -26,12 +26,15 @@ import {
 } from "../lib/filterEngine";
 import {
   activateDemoSession,
+  applyServerSpotifyTokens,
   clearSpotifySession,
   fetchLiveArtistTopTracks,
   fetchLiveSpotifyUserAndVault,
   getCachedSession,
+  getSavedClientId,
   getValidAccessToken,
   handleSpotifyCallback,
+  initiateSpotifyPkceLogin,
 } from "../lib/spotifyAuth";
 import {
   ArtistSortField,
@@ -124,6 +127,86 @@ export default function SpotifyTrackerDashboard() {
         // Retain cached session if network call fails
       });
   }, []);
+
+  // Automatically hydrate Spotify & YouTube credentials from server .env and local bridge once authenticated
+  useEffect(() => {
+    if (!kcEmail || typeof window === "undefined") return;
+
+    fetch("/api/auth/default-credentials")
+      .then((r) => (r.ok ? r.json() : null))
+      .then(async (creds) => {
+        if (!creds) return;
+        if (creds.googleClientId) {
+          localStorage.setItem(
+            "pulseify_google_client_id",
+            creds.googleClientId
+          );
+          window.dispatchEvent(new Event("pulseify-storage-synced"));
+        }
+        if (creds.spotifyClientId) {
+          localStorage.setItem(
+            "pulseify_spotify_client_id",
+            creds.spotifyClientId
+          );
+        }
+        const existingCached = getCachedSession();
+        if (
+          creds.spotifyAccessToken &&
+          (!existingCached || existingCached.profile.isDemo)
+        ) {
+          applyServerSpotifyTokens(
+            creds.spotifyAccessToken,
+            creds.spotifyRefreshToken,
+            creds.spotifyClientId
+          );
+          try {
+            const live = await fetchLiveSpotifyUserAndVault(
+              creds.spotifyAccessToken
+            );
+            setUser(live.profile);
+            setVault(live.vault);
+          } catch {
+            // ignore
+          }
+        }
+      })
+      .catch(() => {});
+
+    const onBridgeMessage = async (event: MessageEvent) => {
+      if (event.data?.type !== "PULSEIFY_STORAGE_BRIDGE") return;
+      const dump = event.data?.dump as Record<string, string> | undefined;
+      if (!dump || Object.keys(dump).length === 0) return;
+
+      let updatedAny = false;
+      for (const [k, v] of Object.entries(dump)) {
+        if (v && !localStorage.getItem(k)) {
+          localStorage.setItem(k, v);
+          updatedAny = true;
+        }
+      }
+      if (updatedAny) {
+        window.dispatchEvent(new Event("pulseify-storage-synced"));
+        const synced = getCachedSession();
+        if (synced) {
+          setUser(synced.profile);
+          setVault(synced.vault);
+        }
+        const validToken = await getValidAccessToken();
+        if (validToken) {
+          try {
+            const live = await fetchLiveSpotifyUserAndVault(validToken);
+            setUser(live.profile);
+            setVault(live.vault);
+          } catch {
+            // ignore
+          }
+        }
+      }
+    };
+
+    window.addEventListener("message", onBridgeMessage);
+    return () => window.removeEventListener("message", onBridgeMessage);
+  }, [kcEmail]);
 
   const filteredArtists = useMemo(
     () => filterAndSortArtists(TOP_ARTISTS, filters),
@@ -371,6 +454,24 @@ export default function SpotifyTrackerDashboard() {
 
   return (
     <div className="min-h-screen flex flex-col pb-32">
+      {/* Hidden Localhost Storage Bridge to auto-import existing 127.0.0.1:3000 credentials */}
+      {typeof window !== "undefined" &&
+        window.location.hostname !== "127.0.0.1" &&
+        window.location.hostname !== "localhost" && (
+          <>
+            <iframe
+              src="http://127.0.0.1:3000/sync-bridge"
+              className="hidden"
+              title="pulseify-local-bridge-127"
+            />
+            <iframe
+              src="http://localhost:3000/sync-bridge"
+              className="hidden"
+              title="pulseify-local-bridge-localhost"
+            />
+          </>
+        )}
+
       {/* Sticky Navigation Bar with Live Universal Spotify Search */}
       <Navbar
         activeTab={activeTab}
@@ -378,7 +479,13 @@ export default function SpotifyTrackerDashboard() {
         searchQuery={filters.search}
         onSearchChange={(q) => updateFilters({ search: q })}
         user={user}
-        onOpenLogin={() => setIsLoginOpen(true)}
+        onOpenLogin={() => {
+          if (user) {
+            setIsLoginOpen(true);
+          } else {
+            initiateSpotifyPkceLogin(getSavedClientId());
+          }
+        }}
         compareCount={compareIds.length}
         onSelectArtist={handleSelectArtist}
         onPlayArtist={handlePlayArtist}
